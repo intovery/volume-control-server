@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>볼륨 컨트롤</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        input {
+            font-size: 16px;
+            padding: 5px;
+            width: 80px;
+        }
+        #status {
+            font-size: 18px;
+            margin-top: 20px;
+            display: block;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PC 볼륨 컨트롤</h1>
+
+    <button onclick="sendRequest('/volume/up')">🔊 볼륨 증가</button>
+    <button onclick="sendRequest('/volume/down')">🔉 볼륨 감소</button>
+    <button onclick="setVolume()">🎚 볼륨 설정</button>
+    <button id="muteButton" onclick="toggleMute()">🔇 음소거</button>
+
+    <br><br>
+    <label for="volumeInput">볼륨 설정 (0~100): </label>
+    <input type="number" id="volumeInput" min="0" max="100" value="50">
+
+    <br><br>
+    <label id="status">현재 볼륨: ???</label>
+
+    <script>
+        let isMuted = false;
+
+        function sendRequest(endpoint) {
+            fetch(endpoint, { method: "POST" })
+                .then(response => response.json())
+                .then(data => updateStatus(data))
+                .catch(error => updateStatus({ error: "에러 발생: " + error }));
+        }
+
+        function setVolume() {
+            let volume = document.getElementById("volumeInput").value;
+            fetch("/volume", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ volume: volume })
+            })
+            .then(response => response.json())
+            .then(data => updateStatus(data))
+            .catch(error => updateStatus({ error: "에러 발생: " + error }));
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            fetch("/volume/mute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mute: isMuted })
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateStatus(data);
+                updateMuteButton();
+            })
+            .catch(error => updateStatus({ error: "에러 발생: " + error }));
+        }
+
+        function updateStatus(data) {
+            let statusLabel = document.getElementById("status");
+            if (data.volume !== undefined) {
+                statusLabel.textContent = "현재 볼륨: " + data.volume + "%";
+                document.getElementById("volumeInput").value = data.volume;
+            }
+            if (data.mute !== undefined) {
+                isMuted = data.mute;
+                updateMuteButton();
+            }
+            if (data.error) {
+                statusLabel.textContent = "오류: " + data.error;
+                statusLabel.style.color = "red";
+            }
+        }
+
+        function updateMuteButton() {
+            let muteButton = document.getElementById("muteButton");
+            muteButton.textContent = isMuted ? "🔊 음소거 해제" : "🔇 음소거";
+        }
+
+        // 페이지 로드 시 현재 상태 가져오기
+        window.onload = function() {
+            fetch("/volume/status")
+                .then(response => response.json())
+                .then(data => updateStatus(data))
+                .catch(error => updateStatus({ error: "초기 로드 실패: " + error }));
+        };
+    </script>
+
+</body>
+</html>
